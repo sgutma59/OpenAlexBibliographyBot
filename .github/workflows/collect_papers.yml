@@ -1,0 +1,59 @@
+name: Collect Academic Papers
+
+on:
+  # Run every Monday at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+  
+  # Also allow manual trigger
+  workflow_dispatch:
+    inputs:
+      search_term:
+        description: 'Search term for papers'
+        required: false
+        default: 'algorithmic bias'
+      pages:
+        description: 'Number of pages to fetch'
+        required: false
+        default: '3'
+
+jobs:
+  collect-papers:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run paper collection
+      run: |
+        # Use input values or defaults
+        SEARCH_TERM="${{ github.event.inputs.search_term || 'algorithmic bias' }}"
+        PAGES="${{ github.event.inputs.pages || '3' }}"
+        
+        # Create data directory if it doesn't exist
+        mkdir -p data
+        
+        # Run the script (update filename if yours is different)
+        python3 openalex.py "$SEARCH_TERM" \
+          --pages $PAGES \
+          --since 2023 \
+          -o "data/papers_$(date +%Y%m%d).csv"
+    
+    - name: Commit and push results
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/*.csv
+        git diff --staged --quiet || git commit -m "Auto: Add papers collected on $(date +%Y-%m-%d)"
+        git push

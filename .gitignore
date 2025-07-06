@@ -6,12 +6,12 @@ __pycache__/
 env/
 venv/
 
-# Data files (if you want to ignore local CSVs)
-*.csv
-
 # Mac
 .DS_Store
 
 # IDEs
 .vscode/
 .idea/
+
+# Keep local test CSVs out, but allow data folder CSVs
+/*.csv
