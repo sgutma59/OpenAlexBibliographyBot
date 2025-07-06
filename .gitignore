@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+
+# Data files (if you want to ignore local CSVs)
+*.csv
+
+# Mac
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
