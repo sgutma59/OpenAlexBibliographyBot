@@ -20,6 +20,8 @@ on:
 jobs:
   collect-papers:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout repository
@@ -32,7 +34,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python3 -m pip install --upgrade pip
         pip install -r requirements.txt
     
     - name: Run paper collection
@@ -44,7 +46,7 @@ jobs:
         # Create data directory if it doesn't exist
         mkdir -p data
         
-        # Run the script (update filename if yours is different)
+        # Run the script
         python3 openalex.py "$SEARCH_TERM" \
           --pages $PAGES \
           --since 2023 \
