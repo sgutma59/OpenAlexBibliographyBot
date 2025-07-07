@@ -305,9 +305,6 @@ Examples:
     p.add_argument("--has-doi", action="store_true",
                help="Only papers with DOIs")
     
-    
-    
-    
     return p
 
 
@@ -321,6 +318,33 @@ def build_date_filter(since: str = None, until: str = None) -> str:
         filters.append(f"to_publication_date:{until}-12-31")
     
     return ",".join(filters) if filters else None
+
+def build_filters(
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    publication_type: Optional[str] = None,
+    only_oa: bool = False,
+    min_citations: Optional[int] = None,
+    max_citations: Optional[int] = None,
+    has_doi: bool = False
+) -> List[str]:
+    """Build OpenAlex filter list."""
+    filters = []
+    if since:
+        filters.append(f"from_publication_date:{since}-01-01")
+    if until:
+        filters.append(f"to_publication_date:{until}-12-31")
+    if publication_type:
+        filters.append(f"type:{publication_type}")
+    if only_oa:
+        filters.append("is_oa:true")
+    if min_citations:
+        filters.append(f"cited_by_count:>{min_citations}")
+    if max_citations:
+        filters.append(f"cited_by_count:<{max_citations}")
+    if has_doi:
+        filters.append("has_doi:true")
+    return filters
 
 
 def print_summary(df: pd.DataFrame):
@@ -388,7 +412,31 @@ if __name__ == "__main__":
         args.per_page = 200
 
     # Build date filter
-    extra_filter = build_date_filter(since=args.since, until=args.until)
+    filters = build_filters(
+        since=args.since,
+        until=args.until,
+        publication_type=args.type,
+        only_oa=args.only_oa,
+        min_citations=args.min_citations,
+        max_citations=args.max_citations,
+        has_doi=args.has_doi
+    )
+
+    extra_filter = ",".join(filters) if filters else None
+
+# Initialize df before conditional checks
+    df = pd.DataFrame()
+
+# For venue filtering (after fetching)
+    if args.venue:
+        df = df[df['venue'].str.contains(args.venue, case=False, na=False)]
+
+# For PDF filtering (after fetching)  
+    if args.only_pdf:
+        df = df[df['open_access_pdf'] != '']
+# For PDF filtering (after fetching)  
+    if args.only_pdf:
+        df = df[df['open_access_pdf'] != '']
 
     # Fetch data
     print(f"🔍 Searching OpenAlex for: '{args.topic}'")
