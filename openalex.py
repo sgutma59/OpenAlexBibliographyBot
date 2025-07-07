@@ -291,6 +291,23 @@ Examples:
     p.add_argument("--test", action="store_true",
                    help="Test API connectivity and exit")
     
+    p.add_argument("--type", choices=["article", "review", "preprint", "book-chapter", "book", "paratext","dataset", "other"],
+               help="Filter by publication type")
+    p.add_argument("--only-oa", action="store_true", 
+               help="Only open access papers")
+    p.add_argument("--only-pdf", action="store_true",
+               help="Only papers with downloadable PDFs")
+    p.add_argument("--min-citations", type=int,
+               help="Minimum citation count")
+    p.add_argument("--max-citations", type=int,
+               help="Maximum citation count")
+    p.add_argument("--venue", help="Filter by specific venue")
+    p.add_argument("--has-doi", action="store_true",
+               help="Only papers with DOIs")
+    
+    
+    
+    
     return p
 
 
