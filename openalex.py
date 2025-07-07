@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE_URL = "https://api.openalex.org/works"
+BASE_URL = "https://api.openalex.org/works?mailto=smgutman@gmail.com"
 
 # ---------- core helpers --------------------------------------------------- #
 def fetch_works(

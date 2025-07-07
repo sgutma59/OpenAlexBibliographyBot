@@ -22,7 +22,7 @@ pip install requests pandas
 
 First, create a new Python file named `openalex.py`. This single file will contain all of our necessary code. (However, we will need to create a few small additional files if we want to automate the workflow on git. I won't be going over that part as it's equivalent to what we did in class with the twitterbot minus the API key, but it's in the git if you're interested.)
 
-At the top of the .py file, we start by defining the base URL for the OpenAlex API, and importing all the libraries we need, including argparse. Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us select different search queries and options from the terminal without having to edit the code itself each time we want to change the search.
+At the top of the .py file, we start by defining the base URL for the OpenAlex API (it is best to include an email to go in the better queue), and importing all the libraries we need, including argparse. Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us select different search queries and options from the terminal without having to edit the code itself each time we want to change the search.
 
 ```python
 """
@@ -39,7 +39,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE_URL = "https://api.openalex.org/works"
+BASE_URL = "https://api.openalex.org/works?=mailto=you@example.com"
 ```
 
 ## Step 2: Fetching Data from the API (`fetch_works`)
