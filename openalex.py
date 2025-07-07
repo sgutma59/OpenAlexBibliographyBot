@@ -17,7 +17,7 @@ BASE_URL = "https://api.openalex.org/works"
 # ---------- core helpers --------------------------------------------------- #
 def fetch_works(
     term: str,
-    per_page: int = 25,
+    per_page: int = 200,
     max_pages: int = 2,
     extra_filter: Optional[str] = None,
     polite_delay: float = 1.0,
@@ -138,11 +138,24 @@ def to_dataframe(works: List[Dict]) -> pd.DataFrame:
             "concepts": "; ".join(concepts),
             "type": w.get("type", ""),
             "is_oa": w.get("open_access", {}).get("is_oa", False),
-            "abstract": "Abstract available" if w.get("abstract_inverted_index") else "",
+            "abstract": extract_abstract(w.get("abstract_inverted_index", {}))
         })
     
     return pd.DataFrame(rows)
-
+def extract_abstract(inverted_index):
+    """Convert OpenAlex inverted index to readable text."""
+    if not inverted_index:
+        return ""
+    
+    word_positions = []
+    for word, positions in inverted_index.items():
+        for position in positions:
+            word_positions.append((position, word))
+    
+    word_positions.sort(key=lambda x: x[0])
+    abstract = ' '.join([word for _, word in word_positions])
+    
+    return abstract
 
 def test_simple_query():
     """
@@ -251,14 +264,14 @@ Examples:
     )
 
     # Positional topic
-    p.add_argument("topic", nargs="?", default="machine learning",
+    p.add_argument("topic", nargs="?", default="algorithmic bias",
                    help='Search term, e.g. "natural language processing"')
 
     # Pagination flags
     p.add_argument("--pages", type=int, default=2,     
                    help="How many pages to fetch (default: 2)")
-    p.add_argument("--per-page", type=int, default=25, 
-                   help="Results per page, max 200 (default: 25)")
+    p.add_argument("--per-page", type=int, default=200,
+                   help="Results per page, max 200 (default: 200)")
     
     # Date filtering
     p.add_argument("--since", metavar="YYYY",    

@@ -1,37 +1,36 @@
 # How to Build a Bibliography Bot with Python and the OpenAlex API
 
-This tutorial will guide you through creating a command-line bot that automatically fetches academic research papers from scholarly graphs and saves them as a bibliography in a CSV file. We'll be using the free OpenAlex API to find papers on any topic you choose. 
+This tutorial will guide you through creating a command-line python bot that automatically fetches academic research papers from scholarly graphs and saves them as a bibliography in a CSV file. 
 
-By the end, you'll have a script that can run searches like this from the command line:
-`python3 openalex_bib_generator.py "algorithmic bias" --pages 10 --since 2018`
+We'll be using the free OpenAlex API to find papers on any topic you choose. 
 
-And your search will instantly output a `.csv` file full of relevant research, with doi, url, title, author, year, citation count, publication venue, concepts, and abstract.
+We won't have time to look at any other graphs but this code can be easily modified to work with other scholarly graphs like Semantic Scholar.
 
-The code can be modified to work with other open scholarly graphs like Semantic Scholar. Semantic Scholar has a fairly low rate limit if you do not use an API Key, so I didn't include it in this tutorial.
+By the end, we will have a script that runs searches from the command line: (`python3 openalex.py "algorithmic bias" --pages 10 --since 2018`) and instantly outputs a bibliography of relevant research in a `.csv` file, including title, year, authors, venue, citation count, doi, url, open access status, linked pdf, concepts, type, and abstract. 
 
 ### Preliminaries
 
-Before we start, make sure you have Python installed, and replace 'python3' with 'python' as needed. You will also need to install two popular Python libraries, `requests` and `pandas`. You can install them using pip:
+Before we start, make sure you have Python installed (replace 'python3' with 'python' and vice versa as needed.) You will also need to install two Python libraries, `requests` and `pandas`. You can install them using pip:
 
 ```bash
 pip install requests pandas
 ```
 - **requests:** A library for making HTTP requests to websites and APIs.
-- **pandas:** A library for data analysis and manipulation which we will use to organize our data and save it to a formatted csv.file.
+- **pandas:** A library for data analysis and manipulation which we use to organize our data and save it to a formatted csv.file.
 
 ---
 
 ## Step 1: Setting Up the Script and Imports
 
-First, create a new Python file named `openalex_bib_generator.py`. This single file will contain all of our code.
+First, create a new Python file named `openalex.py`. This single file will contain all of our necessary code. However, we will need to create a few very small additional files if we want to automate the workflow on git.
 
-At the top of the file, we will import the libraries we'll need and define the base URL for the OpenAlex API. 
+At the top of the .py file, we start by importing all the libraries we need, including argparse, and defining the base URL for the OpenAlex API. 
 
-Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us run the script directly from the terminal selecting different search options (e.g., python openalex_bib_generator.py "AI ethics" --pages 5) without having to edit the code itself each time we want to change the search query.
+Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us select different search queries and options from the terminal without having to edit the code itself each time we want to change the search.
 
 ```python
 """
-openalex_bib_generator.py
+openalex.py
 ------------------------
 
 Bibliography generator using OpenAlex API for academic research
@@ -49,8 +48,9 @@ BASE_URL = "https://api.openalex.org/works"
 
 ## Step 2: Fetching Data from the API (`fetch_works`)
 
-This is the core function of our bot. It will contact the OpenAlex API, search for a topic, and handle fetching multiple pages of results. It specifies a search `term` (like "machine learning"), the number of pages and results to get, and other filters. It loops for each page we want, builds the correct URL with our search parameters, and makes a `GET` request. Note that we optionally add a `time.sleep(1.0)` delay between our requests. This is to avoid sending too many requests too quickly and getting blocked.
-Keep in mind that we are also building a command line interface with argparse that will allow us to change these values from the command line. So if we want to change the defaults in our code, we need to change them in argparse, as the defaults specified in building argparse override these when we do not specify a value in the command line for our query.
+This is the core function of our bot. It will contact the OpenAlex API, search for a topic, and handle fetching multiple pages of results. It specifies a search `term` (like "algorithmic bias "), the number of pages and results to get, and potentially other filters. It loops for each page we want, builds the correct URL with our search parameters, and makes a `GET` request. Note that we optionally add a `time.sleep(1.0)` delay between our requests. This is to avoid sending too many requests too quickly and getting blocked.
+
+**Keep in mind that we are also building a command line interface with argparse that will allow us to change these values from the command line. So if we want to change the defaults in our code, we need to change them in argparse, as the defaults specified in building argparse override these when we do not specify a value in the command line for our query.**
 
 ```python
 def fetch_works(
@@ -79,7 +79,8 @@ def fetch_works(
                 BASE_URL, 
                 params=params,
                 timeout=30, 
-                headers={"User-Agent": "openalex-bib-generator/1.0"} # This is to identify our script and reduce our chance of being blocked.
+                headers={"User-Agent": "openalex-bib-generator/1.0"} 
+                # This is to identify our script and reduce our chance of being blocked.
             )
             
             # Debug: print the actual URL being called
@@ -113,9 +114,9 @@ def fetch_works(
 
 ## Step 3: Cleaning the Data with Pandas (`to_dataframe`)
 
-The data we get from the API is in JSON format, which we want to turn into a simple spreadsheet. This is where we use the `pandas` library.
+The data we get from the API is in JSON format, which we want to turn into a formatted spreadsheet via the `pandas` library.
 
-This function will loop through each paper we fetched and pull out the specific pieces of information we care about: title, authors, publication year, etc. It then organizes this clean data into a pandas DataFrame.
+This function will loop through each paper we fetched and pull out the specific pieces of information and metadata we care about in our bibliography: title, authors, publication year, abstract, venue, type, citations, etc. It then organizes this clean data into a pandas DataFrame.
 
 ```python
 def to_dataframe(works: List[Dict]) -> pd.DataFrame:
@@ -184,11 +185,35 @@ def to_dataframe(works: List[Dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 ```
 
+**For completeness, I've initially shown a compact version that does not extract the abstract but just extracts the metadata of whether the paper includes an abstract, as OpenAlex stores the abstracts in the non-readable inverted index format, and saving the abstracts makes the CSV about 3x larger. But since the csv files are small to begin with, I would default to always extracting the full abstract to our bibliography. We can make two changes to tell the to_dataframe function to extract the abstract and to convert the abstract inverted index into readable text. If you are especially interested in extracting abstracts, it's worth noting that semantic scholar doesn't store abstracts in inverted index, and also offers 1-sentence AI-generated mini abstracts that will fit nicely into the rows of our bibliography csv file.**
+
+```python
+
+# Change the line beginning with "abstract:" in the to_dataframe function to extract the abstract
+"abstract": extract_abstract(w.get("abstract_inverted_index", {})),
+
+# Add after the to_dataframe function to make the inverted index abstract readable
+def extract_abstract(inverted_index):
+    """Convert OpenAlex inverted index to readable text."""
+    if not inverted_index:
+        return ""
+    
+    word_positions = []
+    for word, positions in inverted_index.items():
+        for position in positions:
+            word_positions.append((position, word))
+    
+    word_positions.sort(key=lambda x: x[0])
+    abstract = ' '.join([word for _, word in word_positions])
+    
+    return abstract
+```
+
+**OpenAlex does not store full texts, so we are not grabbing full text either but we do fetch the paper's open access status as part of the metadata in our bibliography, including extracting the open access pdf url to our csv, creating a one click download of the pdf. We could add a script to our code to automatically download the pdf if it's available from the open access URL and automate this click but I haven't done that, for a variety of reasons. This is not really geared towards mass downloading of texts, open access or not.**
+
 ## Step 4: Building the Command-Line Interface (CLI)
 
-To make our script easy to use, we give it a command-line interface using the `argparse` library. This allows users to pass in arguments like the search topic or the number of pages directly from the terminal, without having to edit the code.
-
-This function defines all the arguments our script will accept.
+**To make our script easy to use, we provide it a command-line interface using the `argparse` library. This allows us to pass in arguments like the search topic or the number of pages directly from the terminal, without having to edit the code to change the query. This function defines all the arguments our script will accept.**
 
 ```python
 
@@ -204,7 +229,7 @@ Examples:
         """
     )
 
-    p.add_argument("topic", nargs="?", default="machine learning",
+    p.add_argument("topic", nargs="?", default="algorithmic bias",
                    help='Search term, e.g. "natural language processing"')
     p.add_argument("--pages", type=int, default=2,     
                    help="How many pages to fetch (default: 2)")
@@ -216,6 +241,7 @@ Examples:
     
     return p
 ```
+**Change Default values here.**
 
 ## Step 5: Putting It All Together
 
@@ -273,9 +299,49 @@ if __name__ == "__main__":
     df.to_csv(output_file, index=False)
     print(f"\n✅ Saved {output_file} with {len(df)} records")
 
-    # Show a preview
+    # Build a preview
+
     print(f"\n📋 Preview of results:")
-    print(df[['title', 'authors', 'year', 'citation_count']].head())
+    preview_cols = ['title', 'authors', 'year', 'citation_count']
+    available_cols = [col for col in preview_cols if col in df.columns]
+    if not df.empty:
+        print(df[available_cols].head())
+
+   def print_summary(df: pd.DataFrame):
+    """Print a summary of the retrieved data."""
+    if df.empty:
+        print("❌ No data retrieved.")
+        return
+    
+    print(f"\n📊 Dataset Summary:")
+    print(f"   Total papers: {len(df)}")
+    
+    # Year analysis
+    years = df['year'].replace('', pd.NA).dropna()
+    if not years.empty:
+        year_nums = pd.to_numeric(years, errors='coerce').dropna()
+        if not year_nums.empty:
+            print(f"   Year range: {int(year_nums.min())} - {int(year_nums.max())}")
+            print(f"   Median year: {int(year_nums.median())}")
+    
+    # Citation analysis
+    print(f"   Average citations: {df['citation_count'].mean():.1f}")
+    print(f"   Median citations: {df['citation_count'].median():.0f}")
+    print(f"   Max citations: {df['citation_count'].max()}")
+    
+    # Other stats
+    print(f"   Open access papers: {df['is_oa'].sum()} ({df['is_oa'].mean():.1%})")
+    print(f"   Papers with PDFs: {(df['open_access_pdf'] != '').sum()}")
+    print(f"   Unique venues: {df['venue'].nunique()}")
+    
+    # Top venues
+    top_venues = df['venue'].value_counts().head(3)
+    if not top_venues.empty:
+        print("\n   Top venues:")
+        for venue, count in top_venues.items():
+            if venue:  # Skip empty venues
+                print(f"   - {venue}: {count} papers")
+                
 ```
 
 ## How to Run Your Bot
@@ -284,17 +350,46 @@ Save your file. Now you can run your bot from your terminal. Open a terminal, na
 
 **Basic search:**
 ```bash
-python openalex_bib_generator.py "algorithmic bias"
+python openalex.py "algorithmic bias"
 ```
 
-**Search for 3 pages of results:**
+**Search for X pages of results:**
 ```bash
-python openalex_bib_generator.py "large language models" --pages 3
+python openalex.py "large language models" --pages 9
 ```
 
-**Search for papers since 2022:**
+**Search for papers since/until:**
 ```bash
-python openalex_bib_generator.py "AI in education" --since 2022
+python openalex.py "AI in education" --since 2022
 ```
+python openalex.py "Artificial Intelligence" --since 1500 --until 2500
+```
+# Other filter examples
 
-Each time you run it, a new `.csv` file will be created in the same folder, ready for you to use
+--author "Smith"      # Papers by specific author
+
+--type article   # only journal articles
+--type review  
+--type preprint
+--type book-chapter
+--type book
+--type paratext    # proceedings/conference papers
+--type other
+
+# CITATIONS
+--min-citations 10  # at least 10 citations
+--max-citations 100 # at most 100 citations
+
+--only-oa          # only open access papers
+--only-pdf         # only papers with PDFs
+
+--has-doi          # only papers with DOIs
+--venue "Nature"   # specific journal/venue
+
+# Exclude
+--exclude-preprints   # Filter out arXiv, bioRxiv
+--exclude "term"      # Exclude papers with term in title
+
+Each time you run the search, a new `.csv` file will be created in the same folder, ready for you to use.
+
+** We can also automate this code the same way we created the github actions in .yml for our twitter bot in class, simply omitting the API key. This is included in my code in Github but I leave it out of the tutorial due to time constraints. **
