@@ -38,7 +38,7 @@ def fetch_works(
             params['filter'] = extra_filter
         
         try:
-            print(f"🔄 Fetching page {page + 1}...")
+            print(f"[INFO] Fetching page {page + 1}...")
             r = requests.get(
                 BASE_URL, 
                 params=params,
@@ -307,18 +307,6 @@ Examples:
     
     return p
 
-
-def build_date_filter(since: str = None, until: str = None) -> str:
-    """Build OpenAlex date filter string."""
-    filters = []
-    
-    if since:
-        filters.append(f"from_publication_date:{since}-01-01")
-    if until:
-        filters.append(f"to_publication_date:{until}-12-31")
-    
-    return ",".join(filters) if filters else None
-
 def build_filters(
     since: Optional[str] = None,
     until: Optional[str] = None,
@@ -411,7 +399,7 @@ if __name__ == "__main__":
         print(f"Warning: OpenAlex limits results to 200 per page. Overriding 'per-page' value to 200.")
         args.per_page = 200
 
-    # Build date filter
+    # Build all filters
     filters = build_filters(
         since=args.since,
         until=args.until,
@@ -426,17 +414,6 @@ if __name__ == "__main__":
 
 # Initialize df before conditional checks
     df = pd.DataFrame()
-
-# For venue filtering (after fetching)
-    if args.venue:
-        df = df[df['venue'].str.contains(args.venue, case=False, na=False)]
-
-# For PDF filtering (after fetching)  
-    if args.only_pdf:
-        df = df[df['open_access_pdf'] != '']
-# For PDF filtering (after fetching)  
-    if args.only_pdf:
-        df = df[df['open_access_pdf'] != '']
 
     # Fetch data
     print(f"🔍 Searching OpenAlex for: '{args.topic}'")
@@ -459,6 +436,13 @@ if __name__ == "__main__":
         exit(1)
 
     df = to_dataframe(works)
+    # For venue filtering (after fetching)
+    if args.venue:
+        df = df[df['venue'].str.contains(args.venue, case=False, na=False)]
+
+# For PDF filtering (after fetching)  
+    if args.only_pdf:
+        df = df[df['open_access_pdf'] != '']
     print_summary(df)
 
     # Generate output filename

@@ -2,31 +2,27 @@
 
 This tutorial will guide you through creating a command-line python bot that automatically fetches academic research papers from scholarly graphs and saves them as a bibliography in a CSV file. 
 
-We'll be using the free OpenAlex API to find papers on any topic you choose. 
+We'll be using the free OpenAlex API to find papers on any topic you choose. We won't have time to look at any other graphs but this code can be easily modified to work with other scholarly graphs like Semantic Scholar.
 
-We won't have time to look at any other graphs but this code can be easily modified to work with other scholarly graphs like Semantic Scholar.
-
-By the end, we will have a script that runs searches from the command line: (`python3 openalex.py "algorithmic bias" --pages 10 --since 2018`) and instantly outputs a bibliography of relevant research in a `.csv` file, including title, year, authors, venue, citation count, doi, url, open access status, linked pdf, concepts, type, and abstract. 
+By the end, we will have a script that runs searches from the command line: (`python3 openalex.py "algorithmic bias" --since 2020`) and instantly outputs a bibliography of relevant research in a `.csv` file, including title, year, authors, venue, citation count, doi, url, open access status, linked pdf, concepts, type of record, and abstract. 
 
 ### Preliminaries
 
-Before we start, make sure you have Python installed (replace 'python3' with 'python' and vice versa as needed.) You will also need to install two Python libraries, `requests` and `pandas`. You can install them using pip:
+Before we start, make sure you have Python installed (and remember to replace 'python3' with 'python' and vice versa as needed.) You will also need to install two Python libraries, `requests` and `pandas`. You can install them using pip:
 
 ```bash
 pip install requests pandas
 ```
-- **requests:** A library for making HTTP requests to websites and APIs.
-- **pandas:** A library for data analysis and manipulation which we use to organize our data and save it to a formatted csv.file.
+- **requests:** This is a library for making HTTP requests to websites and APIs.
+- **pandas:** This is a library for data analysis and manipulation which we use to organize our data and save it to a formatted csv.file.
 
 ---
 
 ## Step 1: Setting Up the Script and Imports
 
-First, create a new Python file named `openalex.py`. This single file will contain all of our necessary code. However, we will need to create a few very small additional files if we want to automate the workflow on git.
+First, create a new Python file named `openalex.py`. This single file will contain all of our necessary code. (However, we will need to create a few small additional files if we want to automate the workflow on git. I won't be going over that part as it's equivalent to what we did in class with the twitterbot minus the API key, but it's in the git if you're interested.)
 
-At the top of the .py file, we start by importing all the libraries we need, including argparse, and defining the base URL for the OpenAlex API. 
-
-Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us select different search queries and options from the terminal without having to edit the code itself each time we want to change the search.
+At the top of the .py file, we start by defining the base URL for the OpenAlex API, and importing all the libraries we need, including argparse. Argparse allows us to create command-line interfaces and define arguments like topic, --pages, and --since, letting us select different search queries and options from the terminal without having to edit the code itself each time we want to change the search.
 
 ```python
 """
@@ -38,7 +34,7 @@ Bibliography generator using OpenAlex API for academic research
 
 import argparse
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 import pandas as pd
 import requests
@@ -64,7 +60,7 @@ def fetch_works(
     works: list[Dict] = []
     
     for page in range(max_pages):
-        print(f"🔄 Fetching page {page + 1}...")
+        print(f"[INFO] Fetching page {page + 1}...")
         params = {
             'search': term,
             'per-page': per_page,
@@ -208,106 +204,8 @@ def extract_abstract(inverted_index):
     
     return abstract
 ```
-
-**OpenAlex does not store full texts, so we are not grabbing full text either but we do fetch the paper's open access status as part of the metadata in our bibliography, including extracting the open access pdf url to our csv, creating a one click download of the pdf. We could add a script to our code to automatically download the pdf if it's available from the open access URL and automate this click but I haven't done that, for a variety of reasons. This is not really geared towards mass downloading of texts, open access or not.**
-
-## Step 4: Building the Command-Line Interface (CLI)
-
-**To make our script easy to use, we provide it a command-line interface using the `argparse` library. This allows us to pass in arguments like the search topic or the number of pages directly from the terminal, without having to edit the code to change the query. This function defines all the arguments our script will accept.**
-
 ```python
-
-def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Harvest OpenAlex papers and save a customized bibliography",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s "machine learning"
-  %(prog)s "natural language processing" --pages 3
-  %(prog)s "computer vision" --since 2020
-        """
-    )
-
-    p.add_argument("topic", nargs="?", default="algorithmic bias",
-                   help='Search term, e.g. "natural language processing"')
-    p.add_argument("--pages", type=int, default=2,     
-                   help="How many pages to fetch (default: 2)")
-    p.add_argument("--per-page", type=int, default=25, 
-                   help="Results per page, max 200 (default: 25)")
-    p.add_argument("--since", metavar="YYYY", help="From this year (inclusive)")
-    p.add_argument("--until", metavar="YYYY", help="Up to this year (inclusive)")
-    p.add_argument("-o", "--output", help="Output filename (auto-generated if omitted)")
-    
-    return p
-```
-**Change Default values here.**
-
-## Step 5: Putting It All Together
-
-Finally, we need a main execution block. This code will only run when you execute the script directly from the command line.
-
-This section orchestrates the whole process:
-1.  It calls `build_arg_parser()` to read the user's command-line inputs.
-2.  It calls `fetch_works()` with the user's topic to get the data.
-3.  It passes that data to `to_dataframe()` to clean it.
-4.  It generates a unique filename for the output.
-5.  It uses the `.to_csv()` method from pandas to save the results.
-6.  It prints a helpful summary to the screen.
-
-```python
-if __name__ == "__main__":
-    args = build_arg_parser().parse_args()
-
-    # Validate per_page limit (OpenAlex has a max of 200)
-    if args.per_page > 200:
-        print("⚠️  OpenAlex limits results to 200 per page. Setting to 200.")
-        args.per_page = 200
-
-    # Build date filter if --since or --until were used
-    date_filters = []
-    if args.since:
-        date_filters.append(f"from_publication_date:{args.since}-01-01")
-    if args.until:
-        date_filters.append(f"to_publication_date:{args.until}-12-31")
-    extra_filter = ",".join(date_filters) if date_filters else None
-
-    # --- Main Workflow ---
-    print(f"🔍 Searching OpenAlex for: '{args.topic}'")
-    works = fetch_works(
-        term=args.topic,
-        per_page=args.per_page,
-        max_pages=args.pages,
-        extra_filter=extra_filter
-    )
-
-    if not works:
-        print("\n❌ No results found. Exiting.")
-        exit(1)
-
-    df = to_dataframe(works)
-
-    # --- Saving the Output ---
-    if args.output:
-        output_file = Path(args.output)
-    else:
-        from datetime import datetime
-        safe_topic = args.topic.lower().replace(" ", "_")[:40]
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        output_file = Path(f"openalex_{safe_topic}_{timestamp}.csv")
-
-    df.to_csv(output_file, index=False)
-    print(f"\n✅ Saved {output_file} with {len(df)} records")
-
-    # Build a preview
-
-    print(f"\n📋 Preview of results:")
-    preview_cols = ['title', 'authors', 'year', 'citation_count']
-    available_cols = [col for col in preview_cols if col in df.columns]
-    if not df.empty:
-        print(df[available_cols].head())
-
-   def print_summary(df: pd.DataFrame):
+ def print_summary(df: pd.DataFrame):
     """Print a summary of the retrieved data."""
     if df.empty:
         print("❌ No data retrieved.")
@@ -341,6 +239,164 @@ if __name__ == "__main__":
         for venue, count in top_venues.items():
             if venue:  # Skip empty venues
                 print(f"   - {venue}: {count} papers")
+```
+
+**OpenAlex does not store full texts, so we are not grabbing full text either but we do fetch the paper's open access status as part of the metadata in our bibliography, including extracting the open access pdf url to our csv, creating a one click download of the pdf. We could add a script to our code to automatically download the pdf if it's available from the open access URL and automate this click but I haven't done that, for a variety of reasons. This is not really geared towards mass downloading of texts, open access or not.**
+
+## Step 4: Building the Command-Line Interface (CLI)
+
+**To make our script easy to use, we provide it a command-line interface using the `argparse` library. This allows us to pass in arguments like the search topic or the number of pages directly from the terminal, without having to edit the code to change the query. This function defines all the arguments our script will accept.**
+
+```python
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="Harvest OpenAlex papers and save a customized bibliography",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s "machine learning"
+  %(prog)s "natural language processing" --pages 3
+  %(prog)s "computer vision" --since 2020
+        """
+    )
+    # Change default search values for command line interface here
+
+    p.add_argument("topic", nargs="?", default="algorithmic bias",
+                   help='Search term, e.g. "natural language processing"')
+    p.add_argument("--pages", type=int, default=2,     
+                   help="How many pages to fetch (default: 2)")
+    p.add_argument("--per-page", type=int, default=25, 
+                   help="Results per page, max 200 (default: 25)")
+    p.add_argument("--since", metavar="YYYY", help="From this year (inclusive)")
+    p.add_argument("--until", metavar="YYYY", help="Up to this year (inclusive)")
+    p.add_argument("-o", "--output", help="Output filename (auto-generated if omitted)")
+
+    # Add more powerful search filters for open access, has pdf, citation count, specific venue, type of text (book, article, pre-print, review, etc.,)
+
+    p.add_argument("--type", choices=["article", "review", "preprint", "book-chapter", "book", "paratext", "dataset", "other"],
+               help="Filter by publication type")
+    p.add_argument("--only-oa", action="store_true", 
+               help="Only open access papers")
+    p.add_argument("--only-pdf", action="store_true",
+               help="Only papers with downloadable PDFs")
+    p.add_argument("--min-citations", type=int,
+               help="Minimum citation count")
+    p.add_argument("--max-citations", type=int,
+               help="Maximum citation count")
+    p.add_argument("--venue", help="Filter by specific venue")
+    p.add_argument("--has-doi", action="store_true",
+               help="Only papers with DOIs")
+    
+    return p
+```
+
+## We need a helper function to convert our command-line arguments into OpenAlex API filters:
+  ```python
+
+    def build_filters(
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    publication_type: Optional[str] = None,
+    only_oa: bool = False,
+    min_citations: Optional[int] = None,
+    max_citations: Optional[int] = None,
+    has_doi: bool = False
+) -> List[str]:
+    """Build OpenAlex filter list."""
+    filters = []
+    if since:
+        filters.append(f"from_publication_date:{since}-01-01")
+    if until:
+        filters.append(f"to_publication_date:{until}-12-31")
+    if publication_type:
+        filters.append(f"type:{publication_type}")
+    if only_oa:
+        filters.append("is_oa:true")
+    if min_citations:
+        filters.append(f"cited_by_count:>{min_citations}")
+    if max_citations:
+        filters.append(f"cited_by_count:<{max_citations}")
+    if has_doi:
+        filters.append("has_doi:true")
+    return filters
+    ```
+
+## Step 5: Putting It All Together
+
+Finally, we need a main execution block. This code will only run when you execute the script directly from the command line.
+
+This section orchestrates the whole process:
+1.  It calls `build_arg_parser()` to read the user's command-line inputs.
+2.  It calls `fetch_works()` with the user's topic to get the data.
+3.  It passes that data to `to_dataframe()` to clean it.
+4.  It generates a unique filename for the output.
+5.  It uses the `.to_csv()` method from pandas to save the results.
+6.  It prints a helpful summary to the screen.
+
+```python
+if __name__ == "__main__":
+    args = build_arg_parser().parse_args()
+
+    # Validate per_page limit (OpenAlex has a max of 200)
+    if args.per_page > 200:
+        print("⚠️  OpenAlex limits results to 200 per page. Setting to 200.")
+        args.per_page = 200
+
+    # Build all filters
+    filters = build_filters(
+        since=args.since,
+        until=args.until,
+        publication_type=args.type,
+        only_oa=args.only_oa,
+        min_citations=args.min_citations,
+        max_citations=args.max_citations,
+        has_doi=args.has_doi
+    )
+    extra_filter = ",".join(filters) if filters else None
+
+    # --- Main Workflow ---
+    print(f"🔍 Searching OpenAlex for: '{args.topic}'")
+    works = fetch_works(
+        term=args.topic,
+        per_page=args.per_page,
+        max_pages=args.pages,
+        extra_filter=extra_filter
+    )
+
+    if not works:
+        print("\n❌ No results found. Exiting.")
+        exit(1)
+
+    df = to_dataframe(works)
+
+# Apply local filters after fetching
+    if args.venue:
+        df = df[df['venue'].str.contains(args.venue, case=False, na=False)]
+    if args.only_pdf:
+        df = df[df['open_access_pdf'] != '']
+
+    print_summary(df)
+
+    # --- Saving the Output ---
+    if args.output:
+        output_file = Path(args.output)
+    else:
+        from datetime import datetime
+        safe_topic = args.topic.lower().replace(" ", "_")[:40]
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        output_file = Path(f"openalex_{safe_topic}_{timestamp}.csv")
+
+    df.to_csv(output_file, index=False)
+    print(f"\n✅ Saved {output_file} with {len(df)} records")
+
+    # Build a preview
+
+    print(f"\n📋 Preview of results:")
+    preview_cols = ['title', 'authors', 'year', 'citation_count']
+    available_cols = [col for col in preview_cols if col in df.columns]
+    if not df.empty:
+        print(df[available_cols].head())
                 
 ```
 
@@ -351,45 +407,46 @@ Save your file. Now you can run your bot from your terminal. Open a terminal, na
 **Basic search:**
 ```bash
 python openalex.py "algorithmic bias"
-```
-
+'''
 **Search for X pages of results:**
-```bash
 python openalex.py "large language models" --pages 9
-```
-
+'''
 **Search for papers since/until:**
-```bash
 python openalex.py "AI in education" --since 2022
-```
 python openalex.py "Artificial Intelligence" --since 1500 --until 2500
+'''
+## Advanced Search Examples
+
+**Filter by publication type:**
+python openalex.py "algorithmic bias" --type article
+python openalex.py "AI ethics" --type review
+python openalex.py "neural networks" --type preprint
+python openalex.py --type book-chapter
+python openalex.py --type book
+python openalex.py --type paratext
+python openalex.py --type other
+'''
+
+**Filter by citations:**
+python openalex.py "machine learning" --min-citations 100
+python openalex.py "deep learning" --max-citations 50
+python openalex.py "fairness" --min-citations 10 --max-citations 100
+'''
+
+**Filter by access:**
+python openalex.py "computer vision" --only-oa
+python openalex.py "NLP" --only-pdf
+python openalex.py "robotics" --has-doi
+'''
+
+**Filter by venue:**
+python openalex.py "CRISPR" --venue "Nature"
+python openalex.py "quantum computing" --venue "Science"
+'''
+
+**Combine multiple filters:**
+python openalex.py "bias in AI" --since 2020 --type article --min-citations 50 --only-oa
 ```
-# Other filter examples
-
---author "Smith"      # Papers by specific author
-
---type article   # only journal articles
---type review  
---type preprint
---type book-chapter
---type book
---type paratext    # proceedings/conference papers
---type other
-
-# CITATIONS
---min-citations 10  # at least 10 citations
---max-citations 100 # at most 100 citations
-
---only-oa          # only open access papers
---only-pdf         # only papers with PDFs
-
---has-doi          # only papers with DOIs
---venue "Nature"   # specific journal/venue
-
-# Exclude
---exclude-preprints   # Filter out arXiv, bioRxiv
---exclude "term"      # Exclude papers with term in title
-
-Each time you run the search, a new `.csv` file will be created in the same folder, ready for you to use.
+#Each time you run the search, a new `.csv` file will be created in the same folder, ready for you to use.
 
 ** We can also automate this code the same way we created the github actions in .yml for our twitter bot in class, simply omitting the API key. This is included in my code in Github but I leave it out of the tutorial due to time constraints. **
